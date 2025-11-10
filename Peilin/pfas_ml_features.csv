@@ -1,0 +1,7 @@
+url,title,year,ministry,title_length,body_length,n_action_words,n_risk_words,n_trust_cues,tone_sentiment,trust_signal_score,framing_focus
+https://www.rijksoverheid.nl/onderwerpen/pfas/nieuws/2024/11/14/alle-pfas-geclassificeerd-als-zeer-zorgwekkende-stof,Alle PFAS geclassificeerd als Zeer Zorgwekkende Stof,2024,Ministerie van Infrastructuur en Waterstaat,7,235,2,3,1,0.05,-8.511,general
+https://www.rijksoverheid.nl/onderwerpen/pfas/nieuws/2024/03/12/advies-wissel-je-hobbykipeieren-af-met-eieren-uit-de-supermarkt,Advies: wissel je hobbykipeieren af met eieren uit de supermarkt,2024,"Ministerie van Landbouw, Visserij, Voedselzekerheid en Natuur
+Ministerie van Volksgezondheid, Welzijn en Sport",10,230,0,1,3,0.0,8.696,general
+https://www.rijksoverheid.nl/onderwerpen/pfas/nieuws/2023/10/25/kabinet-vraagt-rivm-om-onderzoek-naar-effecten-chemours,Kabinet vraagt RIVM om onderzoek naar effecten Chemours,2023,Ministerie van Infrastructuur en Waterstaat,8,233,0,1,1,0.25,0.0,general
+https://www.rijksoverheid.nl/onderwerpen/pfas/nieuws/2023/02/07/pfas-verbod-ziet-levenslicht,PFAS-verbod ziet levenslicht,2023,Ministerie van Infrastructuur en Waterstaat,3,245,1,1,0,0.0,-4.082,regulatory
+https://www.rijksoverheid.nl/onderwerpen/pfas/nieuws/2019/11/29/pfas-vanaf-vandaag-meer-ruimte-voor-bouwers-en-baggeraars,PFAS: vanaf vandaag meer ruimte voor bouwers en baggeraars,2019,Ministerie van Infrastructuur en Waterstaat,9,235,0,1,3,0.0,8.511,general
