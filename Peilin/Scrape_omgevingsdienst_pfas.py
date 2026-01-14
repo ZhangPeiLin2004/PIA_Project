@@ -5,9 +5,9 @@ from selenium.webdriver.common.by import By
 import time
 import json
 import re
-from textblob import TextBlob
 from datetime import datetime
 import pandas as pd
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
 # ==============================
 # STEP 1 — Scrape data
@@ -58,8 +58,13 @@ for link in links:
         match = re.search(r"\b20\d{2}-\d{2}-\d{2}\b", main_text)
         if match:
             date = match.group(0)
+        else:
+            # Try to find any date pattern
+            match = re.search(r"\b\d{1,2}\s+\w+\s+20\d{2}\b", main_text[:500])
+            if match:
+                date = match.group(0)
 
-    # No "ministry" concept on this website → keep consistent with your variables
+    # No "ministry" concept on this website
     ministry = ""
 
     parsed.append({
@@ -67,7 +72,8 @@ for link in links:
         "title": title,
         "date": date,
         "ministry": ministry,
-        "body_snippet": main_text[:1500]
+        "body_snippet": main_text[:1500] if main_text else "",
+        "full_text": main_text  # Add full text for VADER analysis
     })
 
 driver.quit()
@@ -82,92 +88,132 @@ with open(INPUT_FILE, "w", encoding="utf-8") as f:
 print(f"Scraped {len(parsed)} PFAS items saved to {INPUT_FILE}")
 
 # ==============================
-# STEP 3 — Load data for ML processing
+# STEP 3 — Load data for VADER processing
 # ==============================
 df = pd.read_json(INPUT_FILE)
 
-# Dictionary limitation --- Words cannot warrant their categories as assigned due to the blind-search method
-ACTION_WORDS = [
-    "verminderen", "aanpakken", "onderzoeken", "regelen",
-    "handhaven", "stoppen", "verbieden", "beschermen", "minimaliseren"
-]
-RISK_WORDS = [
-    "gevaar", "risico", "zorgwekkend", "schadelijk", "bedreiging",
-    "ziekte", "vervuiling", "toxiciteit", "angst", "probleem"
-]
-TRUST_WORDS = [
-    "veilig", "transparant", "bescherming", "betrouwbaar",
-    "verantwoord", "samenwerking", "gezondheid", "openheid", "duidelijk"
-]
+# Initialize VADER analyzer
+analyzer = SentimentIntensityAnalyzer()
 
-def count_keywords(text, keywords):
-    text = text.lower()
-    return sum(1 for kw in keywords if kw in text)
+# Function to get VADER sentiment scores
+def get_vader_scores(text):
+    if pd.isna(text) or not text.strip():
+        return {'compound': 0, 'neg': 0, 'neu': 0, 'pos': 0}
+    return analyzer.polarity_scores(str(text))
 
-def get_sentiment(text):
-    if not text.strip():
-        return 0
-    blob = TextBlob(text)
-    return round(blob.sentiment.polarity, 3)
-
-def extract_year(date_str):
-    match = re.search(r"\b(20\d{2})\b", date_str)
-    return int(match.group(1)) if match else None
-
-# ==============================
-# STEP 4 — Feature extraction
-# ==============================
-features = []
-for _, row in df.iterrows():
-    text = row["body_snippet"]
-    features.append({
-        "url": row["url"],
-        "title": row["title"],
-        "year": extract_year(row["date"]),
-        "ministry": row["ministry"],
-        "title_length": len(row["title"].split()),
-        "body_length": len(text.split()),
-        "n_action_words": count_keywords(text, ACTION_WORDS),
-        "n_risk_words": count_keywords(text, RISK_WORDS),
-        "n_trust_cues": count_keywords(text, TRUST_WORDS),
-        "tone_sentiment": get_sentiment(text),
-        "trust_signal_score": round(
-            (count_keywords(text, TRUST_WORDS) - count_keywords(text, RISK_WORDS)) /
-            max(1, len(text.split())) * 1000, 3
-        )
-    })
-
-df_features = pd.DataFrame(features)
-
-def classify_frame(title, body):
-    text = (title + " " + body).lower()
-    if "verbod" in text or "regels" in text:
-        return "regulatory"
-    elif "gezondheid" in text or "ziekte" in text:
-        return "health"
-    elif "milieu" in text or "beschermen" in text:
-        return "environmental"
+# Function to get sentiment label
+def get_sentiment_label(score):
+    if score >= 0.05:
+        return 'positive'
+    elif score <= -0.05:
+        return 'negative'
     else:
-        return "general"
+        return 'neutral'
 
-df_features["framing_focus"] = [
-    classify_frame(row["title"], row["url"]) for _, row in df_features.iterrows()
-]
+# Apply VADER sentiment analysis
+print("\nPerforming VADER sentiment analysis...")
+
+# Get sentiment scores for titles and full text
+df['title_en'] = df['title']
+df['text_en'] = df['full_text']
+
+# Apply VADER to title and text
+df['title_sentiment'] = df['title_en'].apply(lambda x: get_vader_scores(x)['compound'])
+df['text_sentiment'] = df['text_en'].apply(lambda x: get_vader_scores(x)['compound'])
+
+# Get detailed sentiment scores for text
+sentiment_details = df['text_en'].apply(lambda x: get_vader_scores(x))
+df[['neg', 'neu', 'pos', 'compound']] = pd.DataFrame(sentiment_details.tolist())
+
+# Add sentiment label
+df['sentiment_label'] = df['compound'].apply(get_sentiment_label)
+
+# Add source column (for consistency with previous analysis)
+df['source'] = 'omgevingsdienst'
+
+# Format date for consistency
+def format_date(date_str):
+    if not date_str:
+        return ''
+    # Try to parse various date formats
+    date_patterns = [
+        r'(\d{4}-\d{2}-\d{2})',  # yyyy-mm-dd
+        r'(\d{1,2}\s+\w+\s+\d{4})',  # dd month yyyy
+        r'(\d{1,2}-\d{1,2}-\d{4})',  # dd-mm-yyyy
+    ]
+    
+    for pattern in date_patterns:
+        match = re.search(pattern, str(date_str))
+        if match:
+            date_part = match.group(1)
+            try:
+                # Try to parse and standardize
+                for fmt in ['%Y-%m-%d', '%d %B %Y', '%d-%m-%Y', '%d %b %Y']:
+                    try:
+                        dt = datetime.strptime(date_part, fmt)
+                        return dt.strftime('%Y-%m-%d')
+                    except:
+                        continue
+            except:
+                pass
+    return date_str
+
+df['date'] = df['date'].apply(format_date)
 
 # ==============================
-# STEP 5 — Save ML-ready dataset
+# STEP 4 — Create final dataframe with same structure as previous analysis
 # ==============================
-OUTPUT_FILE = r"E:\Csci_2\omgevingsdienst_pfas_ml_features.csv"
-df_features.to_csv(OUTPUT_FILE, index=False, encoding="utf-8")
+# Select and rename columns to match previous analysis
+final_df = df[['source', 'date', 'url', 'title_en', 'text_en', 
+               'title_sentiment', 'text_sentiment', 'neg', 'neu', 'pos', 
+               'compound', 'sentiment_label']].copy()
 
-print(f"ML-ready dataset saved to {OUTPUT_FILE}")
-print("\nSample of extracted features:\n")
-print(df_features.head())
+# Add any missing columns for consistency
+if 'ministry' in df.columns:
+    final_df['ministry'] = df['ministry']
+
+print("\n" + "=" * 80)
+print("VADER SENTIMENT ANALYSIS RESULTS")
+print("=" * 80)
+print(f"\nTotal articles: {len(final_df)}")
+print(f"Data shape: {final_df.shape}")
+print(f"Date range: {final_df['date'].min() if final_df['date'].notna().any() else 'N/A'} "
+      f"to {final_df['date'].max() if final_df['date'].notna().any() else 'N/A'}")
+
+print(f"\nSentiment Distribution:")
+print(final_df['sentiment_label'].value_counts())
+
+print(f"\nSentiment Score Statistics:")
+print(f"Compound score mean: {final_df['compound'].mean():.4f}")
+print(f"Compound score std: {final_df['compound'].std():.4f}")
+print(f"Compound score min: {final_df['compound'].min():.4f}")
+print(f"Compound score max: {final_df['compound'].max():.4f}")
+
+# Show sample of results
+print("\n" + "=" * 80)
+print("SAMPLE ARTICLES WITH SENTIMENT ANALYSIS")
+print("=" * 80)
+sample_size = min(3, len(final_df))
+for idx, row in final_df.head(sample_size).iterrows():
+    print(f"\nTitle: {row['title_en'][:80]}..." if len(str(row['title_en'])) > 80 else f"\nTitle: {row['title_en']}")
+    print(f"Date: {row['date']}")
+    print(f"Sentiment Score: {row['compound']:.4f} ({row['sentiment_label']})")
+    print(f"Negative: {row['neg']:.4f}, Neutral: {row['neu']:.4f}, Positive: {row['pos']:.4f}")
 
 # ==============================
-# STEP 6 — Test
+# STEP 5 — Save to CSV (matching previous format)
 # ==============================
-df = pd.read_csv(OUTPUT_FILE)
-print(df.columns)
-print(df.head(10))
-df.describe()
+OUTPUT_FILE = r"E:\Csci_2\omgevingsdienst_pfas_vader_analysis.csv"
+final_df.to_csv(OUTPUT_FILE, index=False, encoding='utf-8')
+
+print(f"\n" + "=" * 80)
+print(f"Analysis complete!")
+print(f"Scraped {len(parsed)} articles")
+print(f"Saved VADER analysis to: {OUTPUT_FILE}")
+print("=" * 80)
+
+# Show final column structure
+print("\nFinal DataFrame Columns:")
+print(final_df.columns.tolist())
+print(f"\nFirst few rows:")
+print(final_df.head())
