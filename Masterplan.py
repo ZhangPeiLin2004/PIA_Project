@@ -11,9 +11,9 @@ import io
 # Set encoding to UTF-8 for Windows console
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
-# ======================================================================
+
 # 1. LOAD CLEANED NEWS VADER ANALYSIS AND TENDER_TEXT
-# ======================================================================
+
 
 print("Step 1: Loading and preparing data...")
 
@@ -81,9 +81,9 @@ print("\nAfter cleaning:")
 print(f"News rows: {len(news_df)}")
 print(f"Tender rows: {len(tenders_df)}")
 
-# ======================================================================
+
 # 2. CREATE TF-IDF SCORE COLUMN
-# ======================================================================
+
 
 print("\n" + "="*50)
 print("Step 2: Creating TF-IDF scores for PFAS intensity...")
@@ -190,9 +190,9 @@ else:
 print("\nTF-IDF intensity summary:")
 print(df_tfidf["pfas_tfidf_intensity_norm"].describe())
 
-# ======================================================================
+
 # 3. TENDER PROCEDURE PROXY
-# ======================================================================
+
 
 print("\n" + "="*50)
 print("Step 3: Creating procedure transparency proxy...")
@@ -234,9 +234,9 @@ try:
 except Exception as e:
     print(f"Could not print procedure counts: {e}")
 
-# ======================================================================
+
 # 4. TENDER SCOPE/CATEGORY PROXY
-# ======================================================================
+
 
 print("\n" + "="*50)
 print("Step 4: Classifying tender scope...")
@@ -375,9 +375,9 @@ INTERMEDIATE_PATH = "tenders_ready_for_mlr.csv"
 df_tfidf.to_csv(INTERMEDIATE_PATH, index=False, encoding='utf-8')
 print(f"\nSaved classified tenders to {INTERMEDIATE_PATH}")
 
-# ======================================================================
+
 # 5. TEMPORAL ALIGNMENT
-# ======================================================================
+
 
 print("\n" + "="*50)
 print("Step 5: Temporal alignment (monthly aggregation)...")
@@ -475,9 +475,9 @@ MLR_PATH = "mlr_monthly_dataset.csv"
 df_mlr.to_csv(MLR_PATH, index=False, encoding='utf-8')
 print(f"\nSaved MLR dataset to {MLR_PATH}")
 
-# ======================================================================
+
 # 6. MULTIPLE LINEAR REGRESSION + STARGAZER
-# ======================================================================
+
 
 print("\n" + "="*50)
 print("Step 6: Running multiple linear regression...")
@@ -589,9 +589,9 @@ else:
     except Exception as e:
         print(f"Error running regression: {e}")
 
-# ======================================================================
+
 # 7. SUMMARY STATISTICS
-# ======================================================================
+
 
 print("\n" + "="*50)
 print("SUMMARY STATISTICS")
@@ -639,5 +639,6 @@ dataset_info = {
 import json
 with open('analysis_summary.json', 'w', encoding='utf-8') as f:
     json.dump(dataset_info, f, indent=2, default=str)
+
 
 print("\nSaved analysis summary to analysis_summary.json")
