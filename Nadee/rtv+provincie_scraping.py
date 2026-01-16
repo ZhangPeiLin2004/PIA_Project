@@ -5,9 +5,9 @@ import pandas as pd
 import time
 from urllib.parse import urlparse
 
-# -------------------------
+
 # RAW URL LIST (WITH DUPES)
-# -------------------------
+
 
 RAW_URLS = [
     "https://www.provincie-utrecht.nl/actueel/nieuws/onderzoek-naar-pfas-regenwater-gestart",
@@ -130,3 +130,4 @@ df.to_csv("pfas_news_final.csv", index=False)
 
 print("✅ DONE — saved as pfas_news_final.csv")
 print("Articles scraped:", len(df))
+
